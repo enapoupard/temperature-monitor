@@ -201,6 +201,4 @@ Initial repository setup and requirements documentation are in progress.
 
 ## License
 
-No license has been selected yet. Until a license is added, the repository
-should not be assumed to grant permission for reuse, modification, or
-distribution.
+This project is licensed under the MIT License. See `LICENSE` for details.
