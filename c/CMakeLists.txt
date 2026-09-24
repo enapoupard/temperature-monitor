@@ -14,4 +14,18 @@ target_link_libraries(
         temperature_monitor_c_warnings
 )
 
-message(STATUS "Configured C implementation build skeleton")
+# --- Add the simulation executable ---
+add_executable(
+    c_temperature_simulation
+    src/temperature_simulation.c
+)
+
+# Link the executable to the common build configuration and math library
+target_link_libraries(
+    c_temperature_simulation
+    PRIVATE
+        temperature_monitor_c_build_config
+        m # Required for math functions like sqrt, pow, etc. on some platforms
+)
+
+message(STATUS "Configured C implementation with simulation executable")
