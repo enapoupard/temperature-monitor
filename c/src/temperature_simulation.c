@@ -1,118 +1,79 @@
-#include <stdio.h>
 #include <math.h>
+#include <stdio.h>
 
-/**
- * @brief Simulates a first-order thermal system controlled by a PI controller.
- *
- * This function encapsulates a complete simulation loop to determine the steady-state
- * temperature of a system for a given set-point. It combines:
- * 1. A PI Controller (in standard form with anti-windup).
- * 2. A first-order ODE model of a thermal plant (the "system").
- * 3. A 4th-order Runge-Kutta (RK4) numerical solver to integrate the ODE.
- *
- * The entire simulation runs for a fixed duration to allow the system to
- * reach a stable temperature. This function is self-contained and does not
- * depend on external state.
- *
- * @param set_point_celsius The target temperature for the system in degrees Celsius.
- * @return The final temperature of the system after the simulation completes.
- */
-double simulate_temperature_system(double set_point_celsius) {
-    // --- 1. System and Simulation Parameters ---
-    const double AMBIENT_TEMP_C = 20.0;     // Temperature of the surroundings
-    const double TIME_CONSTANT_S = 120.0;   // Thermal time constant of the system in seconds
-    const double SIMULATION_TIME_S = 1000.0;// Total simulation duration
-    const double TIME_STEP_S = 0.1;         // Integration time step
+double simulate_temperature_system(double setpoint_c)
+{
+    const double ambient_c = 0.0;
+    const double tau_s = 20.0;
+    const double kp = 2.0;
+    const double ki = 0.5;
+    const double dt_s = 0.01;
+    const double simulation_time_s = 200.0;
+    const double output_min = -120.0;
+    const double output_max = 120.0;
+    double temperature_c = ambient_c;
+    double previous_error = setpoint_c - temperature_c;
+    double output = 0.0;
+    int steps = (int)(simulation_time_s / dt_s);
 
-    // --- 2. PI Controller Parameters ---
-    const double KP = 10.0;                 // Proportional gain
-    const double KI = 0.1;                  // Integral gain
-    const double HEATER_MAX_POWER = 150.0;  // Max "power" (effective temp) the heater can apply
-    const double HEATER_MIN_POWER = 0.0;
-
-    // --- 3. State Variables ---
-    double current_temp_c = AMBIENT_TEMP_C; // System starts at ambient temperature
-    double pi_integrator = 0.0;             // Integral term for the PI controller
-    double heater_power = 0.0;              // Current output of the PI controller
-
-    // --- 4. Main Simulation Loop ---
-    int num_steps = (int)(SIMULATION_TIME_S / TIME_STEP_S);
-    for (int i = 0; i < num_steps; ++i) {
-        // a. PI Controller Logic
-        double error = set_point_celsius - current_temp_c;
-
-        // Update integrator with anti-windup: only integrate if the output is not saturated
-        if ((heater_power > HEATER_MIN_POWER && heater_power < HEATER_MAX_POWER) ||
-            (heater_power <= HEATER_MIN_POWER && error > 0) ||
-            (heater_power >= HEATER_MAX_POWER && error < 0)) {
-            pi_integrator += error * TIME_STEP_S;
-        }
-
-        // Calculate controller output
-        heater_power = (KP * error) + (KI * pi_integrator);
-
-        // Clamp output (final anti-windup step)
-        if (heater_power > HEATER_MAX_POWER) {
-            heater_power = HEATER_MAX_POWER;
-        } else if (heater_power < HEATER_MIN_POWER) {
-            heater_power = HEATER_MIN_POWER;
-        }
-
-        // b. ODE Solver (RK4)
-        // The ODE to solve is: dT/dt = (1/tau) * (heater_power - (T - T_ambient))
-        // This models the heater adding energy and the system losing energy to the ambient.
-        double k1, k2, k3, k4;
-        double temp_k2, temp_k3, temp_k4;
-
-        // k1
-        k1 = (1.0 / TIME_CONSTANT_S) * (heater_power - (current_temp_c - AMBIENT_TEMP_C));
-
-        // k2
-        temp_k2 = current_temp_c + (k1 * TIME_STEP_S / 2.0);
-        k2 = (1.0 / TIME_CONSTANT_S) * (heater_power - (temp_k2 - AMBIENT_TEMP_C));
-
-        // k3
-        temp_k3 = current_temp_c + (k2 * TIME_STEP_S / 2.0);
-        k3 = (1.0 / TIME_CONSTANT_S) * (heater_power - (temp_k3 - AMBIENT_TEMP_C));
-
-        // k4
-        temp_k4 = current_temp_c + (k3 * TIME_STEP_S);
-        k4 = (1.0 / TIME_CONSTANT_S) * (heater_power - (temp_k4 - AMBIENT_TEMP_C));
-
-        // Update the temperature state
-        current_temp_c += (TIME_STEP_S / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+    if (!isfinite(setpoint_c) || setpoint_c < 0.0 || setpoint_c > 120.0) {
+        return NAN;
     }
 
-    // --- 5. Return Final State ---
-    return current_temp_c;
+    for (int i = 0; i < steps; ++i) {
+        const double error = setpoint_c - temperature_c;
+        const double candidate =
+            output + kp * (error - previous_error) + ki * dt_s * error;
+        double applied = candidate;
+
+        if (applied > output_max) {
+            applied = output_max;
+        } else if (applied < output_min) {
+            applied = output_min;
+        }
+
+        /*
+         * First-order thermal plant:
+         * dT/dt = (ambient + actuator - T) / tau
+         *
+         * Fixed-step RK4 with constant actuator during this sample.
+         */
+        const double k1 =
+            (ambient_c + applied - temperature_c) / tau_s;
+        const double k2 =
+            (ambient_c + applied -
+             (temperature_c + 0.5 * dt_s * k1)) / tau_s;
+        const double k3 =
+            (ambient_c + applied -
+             (temperature_c + 0.5 * dt_s * k2)) / tau_s;
+        const double k4 =
+            (ambient_c + applied -
+             (temperature_c + dt_s * k3)) / tau_s;
+
+        temperature_c +=
+            (dt_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+
+        output = applied;
+        previous_error = error;
+    }
+
+    return temperature_c;
 }
 
-/**
- * @brief Main entry point to demonstrate the temperature simulation.
- *
- * This program calls the simulation function with several different set-points
- * to generate temperatures across the required operational ranges.
- */
-int main(void) {
-    printf("--- Temperature System Simulation ---\n");
+int main(void)
+{
+    const double setpoints_c[] = { 0.0, 4.0, 80.0, 85.0, 105.0, 120.0 };
+    const int count =
+        (int)(sizeof(setpoints_c) / sizeof(setpoints_c[0]));
 
-    // Define set-points to target the required temperature ranges
-    // (<5, <85, >=85, >=105)
-    double set_points[] = {
-        0.0,    // Target: Below 5°C
-        80.0,   // Target: Below 85°C
-        95.0,   // Target: At or above 85°C
-        110.0   // Target: At or above 105°C
-    };
-    int num_set_points = sizeof(set_points) / sizeof(set_points[0]);
+    for (int i = 0; i < count; ++i) {
+        const double temperature_c =
+            simulate_temperature_system(setpoints_c[i]);
 
-    for (int i = 0; i < num_set_points; ++i) {
-        double set_point = set_points[i];
-        double final_temp = simulate_temperature_system(set_point);
-        printf("Set-point: %6.2f°C -> Final Simulated Temp: %6.2f°C\n", set_point, final_temp);
+        printf("Setpoint: %6.1f C -> Temperature: %8.3f C\n",
+               setpoints_c[i],
+               temperature_c);
     }
-
-    printf("--- Simulation Complete ---\n");
 
     return 0;
 }

@@ -1,0 +1,13 @@
+#ifndef TEMPERATURE_MONITOR_TEMPERATURE_CLASSIFICATION_H
+#define TEMPERATURE_MONITOR_TEMPERATURE_CLASSIFICATION_H
+
+typedef enum {
+    TEMPERATURE_STATUS_GREEN = 0,
+    TEMPERATURE_STATUS_YELLOW,
+    TEMPERATURE_STATUS_RED,
+    TEMPERATURE_STATUS_INVALID
+} temperature_status_t;
+
+temperature_status_t temperature_classify(double temperature_c);
+
+#endif
