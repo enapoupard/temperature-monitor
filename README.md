@@ -2,202 +2,257 @@
 
 ## Overview
 
-This project demonstrates the architecture and implementation of software for
-a bare-metal embedded temperature-monitoring device.
+This project implements and demonstrates software for a timer-driven
+temperature-monitoring device.
 
-The device samples a temperature sensor through an ADC and visualizes the
-current temperature condition using green, yellow, and red LEDs connected
-through GPIOs.
+A temperature sensor is represented by ADC digits, and the resulting
+temperature condition is displayed using green, yellow, and red LEDs. Hardware
+access is mocked so both implementations can run and be tested on a PC.
 
-For demonstration and evaluation, the hardware interfaces are mocked so that
-the software can run on a PC. The project contains two implementations:
+The repository contains:
 
-- A procedural implementation written in C
-- An object-oriented implementation written in C++
-
-## Functional Requirements
-
-The application shall:
-
-- Sample the temperature sensor every 100 microseconds
-- Minimize sampling jitter through a timer-driven embedded design
-- Read the temperature sensor through an ADC abstraction
-- Control three LEDs through a GPIO abstraction
-- Read the hardware revision and serial number from an EEPROM abstraction
-- Support Rev-A and Rev-B temperature sensors
-- Ensure that only the LED associated with the current condition is active
+- A procedural C implementation
+- An object-oriented C++17 implementation
+- Unit tests for both implementations
+- Interactive C and C++ simulation executables
+- Architecture, requirements, assumptions, and design documentation
 
 ## Temperature Conditions
 
-The temperature conditions are interpreted as follows:
-
 | Temperature range | Condition | Active LED |
 |---|---|---|
-| Below 5 degrees Celsius | Critical | Red |
-| From 5 degrees Celsius up to, but not including, 85 degrees Celsius | Normal | Green |
-| From 85 degrees Celsius up to, but not including, 105 degrees Celsius | Warning | Yellow |
-| 105 degrees Celsius or above | Critical | Red |
+| Below $5$ degrees Celsius | Critical | Red |
+| At least $5$ and below $85$ degrees Celsius | Normal | Green |
+| At least $85$ and below $105$ degrees Celsius | Warning | Yellow |
+| At least $105$ degrees Celsius | Critical | Red |
+| Invalid data | Invalid/fail-safe | Red |
 
-The critical condition takes priority over the normal condition for
-temperatures below 5 degrees Celsius.
+Exactly one condition LED is active after a valid sample has been classified.
 
 ## Supported Hardware Revisions
 
-### Rev-A
+| Revision | EEPROM value | Resolution | Example at $10$ degrees Celsius |
+|---|---:|---:|---:|
+| Rev-A | 0 | $1.0$ degree Celsius per digit | 10 |
+| Rev-B | 1 | $0.1$ degree Celsius per digit | 100 |
 
-- EEPROM hardware revision value: 0
-- Sensor resolution: 1 degree Celsius per raw digit
-- Example: a raw value of 10 represents 10 degrees Celsius
+Only the revision selected from EEPROM is used during one execution.
 
-### Rev-B
+## Implemented Data Flow
 
-- EEPROM hardware revision value: 1
-- Sensor resolution: 0.1 degrees Celsius per raw digit
-- Example: a raw value of 100 represents 10 degrees Celsius
+```text
+Interactive setpoint
+  -> PI-controlled thermal ODE with RK4 integration
+  -> revision-dependent ADC digit
+  -> 100 us sampling-timer dispatch
+  -> ADC-to-temperature conversion
+  -> temperature classification
+  -> mocked GPIO
+  -> traffic-light output
+```
 
-Only one sensor type is operational at a time. The configured hardware revision
-determines which sensor conversion is used.
+During initialization:
 
-## Internal Temperature Representation
+```text
+Revision selection
+  -> mocked I2C
+  -> mocked EEPROM
+  -> revision and serial-number readback
+  -> sensor configuration
+```
 
-The application uses tenths of a degree Celsius as its normalized internal
-temperature unit.
+The thermal simulation is demonstration support and is not part of the core
+temperature-monitoring requirements.
 
-Examples:
+## Components
 
-- Rev-A raw value 10 is normalized to 100
-- Rev-B raw value 100 is normalized to 100
-- Normalized value 100 represents 10.0 degrees Celsius
+Both implementations provide corresponding behavior for:
 
-This approach allows both hardware revisions to use the same classification
-logic without requiring floating-point arithmetic.
+- Rev-A and Rev-B ADC conversion
+- Temperature classification
+- Sampling-timer dispatch
+- GPIO traffic-light control
+- I2C transport
+- EEPROM configuration
+- Integrated PC simulation
 
-## EEPROM Configuration
+The C implementation uses explicit module interfaces, state objects, and
+function pointers where required.
 
-The mocked EEPROM provides:
+The C++ implementation uses small classes, strongly typed enumerations,
+callbacks, constructor-based dependency injection, and `std::optional` for
+operations that may fail.
 
-- Hardware revision
-  - 0 for Rev-A
-  - 1 for Rev-B
-- Hardware serial number
-  - Example placeholder: ABC1234
+## Build
 
-## Implementations
+### Prerequisites
 
-### C implementation
+- CMake 3.16 or newer
+- C11 compiler
+- C++17 compiler
+- CMake-supported native build tool
 
-The C version uses:
+### Configure and build
 
-- Explicit module interfaces
-- Hardware-abstraction functions
-- Mocked PC hardware implementations
-- Testable temperature conversion and classification functions
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+```
 
-### C++ implementation
+Strict compiler warnings are enabled by default.
 
-The C++ version applies object-oriented design principles, including:
+## Test
 
-- Encapsulation
-- Interface-based hardware abstractions
-- Dependency injection
-- Polymorphic sensor implementations
-- Strongly typed states where appropriate
+```bash
+ctest --test-dir build --output-on-failure
+```
 
-Both implementations are intended to provide equivalent functional behavior.
+The test suite covers:
 
-## Architecture
+- Rev-A and Rev-B conversion
+- ADC quantization and invalid values
+- Temperature boundaries
+- Sampling-timer behavior
+- GPIO LED-state mapping
+- Invalid and fail-safe states
+- I2C validation
+- EEPROM read, write, and configuration validation
 
-The planned software layers are:
+## Run
 
-1. PC demonstration application
-2. Temperature-monitoring application logic
-3. Sensor conversion and temperature classification
-4. ADC, GPIO, EEPROM, and timer abstractions
-5. PC mocks or future target-specific drivers
+Run the C simulation:
 
-Architecture diagrams and detailed design documentation will be stored in the
-`docs` directory.
+```bash
+./build/c/c_temperature_simulation
+```
+
+Run the C++ simulation:
+
+```bash
+./build/cpp/cpp_temperature_simulation
+```
+
+Each executable requests:
+
+1. Hardware revision A or B
+2. Temperature setpoints from $0$ to $120$ degrees Celsius
+
+Enter `q` to stop.
+
+Example C++ output:
+
+```text
+Temperature Monitor
+-------------------
+Select hardware revision (A/B): B
+
+Serial number:      ABC1234
+Hardware revision:  Rev-B
+Sensor resolution:  0.1 C/digit
+Sampling period:    100 us
+Valid setpoints:    0 to 120 C
+
+Enter setpoint in C, or q to quit: 84.5
+
+Setpoint:           84.5 C
+Simulated plant:    84.500 C
+ADC digit:          845
+Measured:           84.5 C
+Condition:          NORMAL
+
+Traffic light
+  RED    [OFF]
+  YELLOW [OFF]
+  GREEN  [ON ]
+```
+
+## Build Options
+
+| Option | Default | Purpose |
+|---|---:|---|
+| `TEMPERATURE_MONITOR_BUILD_C` | `ON` | Build the C implementation |
+| `TEMPERATURE_MONITOR_BUILD_CPP` | `ON` | Build the C++ implementation |
+| `TEMPERATURE_MONITOR_ENABLE_STRICT_WARNINGS` | `ON` | Enable strict warnings |
+| `BUILD_TESTING` | `ON` | Build and register tests |
+
+For example, build only C++:
+
+```bash
+cmake -S . -B build-cpp \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DTEMPERATURE_MONITOR_BUILD_C=OFF \
+    -DTEMPERATURE_MONITOR_BUILD_CPP=ON
+cmake --build build-cpp --parallel
+ctest --test-dir build-cpp --output-on-failure
+```
+
+## Repository Structure
+
+```text
+temperature-monitor/
+├── CMakeLists.txt
+├── README.md
+├── LICENSE
+├── docs/
+│   ├── architecture.md
+│   ├── architecture.svg
+│   ├── assumptions.md
+│   ├── building.md
+│   ├── error-handling.md
+│   ├── requirements.md
+│   └── simulation-design.md
+├── c/
+│   ├── CMakeLists.txt
+│   ├── include/
+│   ├── src/
+│   └── tests/
+└── cpp/
+    ├── CMakeLists.txt
+    ├── include/
+    ├── src/
+    └── tests/
+```
 
 ## Timing Model
 
-The required sampling interval is 100 microseconds, corresponding to a sampling
-frequency of 10 kHz.
+The intended embedded sampling period is $100$ microseconds, corresponding to
+$10$ kHz.
 
-On an embedded target, a hardware timer would trigger ADC sampling to minimize
-jitter. The interrupt service routines will be defined in the source code, but
-they do not need to be invoked asynchronously by the PC demonstration.
+The PC demonstrations invoke timer dispatch synchronously and deterministically
+after each accepted setpoint. They validate functional behavior, not hard
+real-time scheduling, interrupt latency, jitter, ADC electrical behavior, or
+GPIO electrical behavior.
 
-The PC implementation demonstrates functional behavior and software
-architecture. It does not guarantee hard real-time timing or prove embedded
-target jitter performance.
+## Error Handling
 
-## Planned Repository Structure
+Invalid configuration, conversion failures, and invalid temperature data are
+rejected explicitly. When reliable classification is unavailable, the logical
+fail-safe LED state is:
 
-    temperature-monitor/
-    ├── README.md
-    ├── CMakeLists.txt
-    ├── docs/
-    ├── c/
-    │   ├── include/
-    │   ├── src/
-    │   └── tests/
-    ├── cpp/
-    │   ├── include/
-    │   ├── src/
-    │   └── tests/
-    ├── mocks/
-    │   ├── include/
-    │   └── src/
-    ├── test_data/
-    └── scripts/
+- Green off
+- Yellow off
+- Red on
 
-The exact structure may evolve as the architecture is refined.
+The LED state alone does not distinguish a system fault from a critical
+temperature.
 
-## Build Status
+## Documentation
 
-The build system has not yet been added.
+Detailed documentation is available in the `docs` directory:
 
-CMake is planned as the build system for the C and C++ implementations.
+- `architecture.md` and `architecture.svg`: software architecture
+- `requirements.md`: requirements and verification overview
+- `assumptions.md`: design interpretations and open questions
+- `building.md`: detailed build and execution instructions
+- `error-handling.md`: failure-handling policy
+- `simulation-design.md`: PI, thermal ODE, RK4, and integration flow
 
-## Testing Strategy
+## Project Status
 
-Testing will cover:
-
-- Rev-A sensor conversion
-- Rev-B sensor conversion
-- Temperature classification boundaries
-- LED-state mapping
-- Invalid hardware revisions
-- EEPROM and ADC failure handling
-- Application initialization
-- Temperature-state transitions
-- Equivalent behavior of the C and C++ implementations
-
-Important boundary values include:
-
-- Below and exactly 5 degrees Celsius
-- Below and exactly 85 degrees Celsius
-- Below and exactly 105 degrees Celsius
-
-## Assumptions
-
-The initial design uses the following assumptions:
-
-- Only one LED is active at a time
-- Critical temperature has priority over normal temperature
-- Temperature thresholds are fixed
-- EEPROM configuration is read during initialization
-- Invalid configuration or sensor data results in a safe error state
-- The red LED is used to indicate a critical or error state
-- Hardware interfaces are mocked for the PC demonstration
-- No temperature filtering is required unless specified later
-
-These assumptions will be reviewed and documented in more detail during the
-architecture phase.
-
-## Current Project Status
-
-Initial repository setup and requirements documentation are in progress.
+The C and C++ implementations, tests, mocked interfaces, and integrated PC
+demonstrations are complete for the current project scope. Target-specific
+bare-metal peripheral drivers and real-time verification remain outside the PC
+demonstration scope.
 
 ## License
 
