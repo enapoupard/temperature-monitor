@@ -290,6 +290,3 @@ The planned verification methods are:
 | Architecture | Documentation review |
 | Sampling design | Architecture and code review |
 | Embedded jitter | Not measurable in the PC demonstration |
-
-A detailed requirements-to-test traceability matrix will be added after the
-tests have been defined.
