@@ -227,7 +227,7 @@ static int parse_setpoint(
 int main(void)
 {
     mock_eeprom_t mock_eeprom = { { 0U } };
-    const eeprom_config_t stored_config = {
+    eeprom_config_t stored_config = {
         .hardware_revision = SENSOR_REV_B,
         .serial_number = "ABC1234"
     };
@@ -245,6 +245,34 @@ int main(void)
             &mock_eeprom) != 0) {
         fprintf(stderr, "Failed to initialize mocked I2C.\n");
         return EXIT_FAILURE;
+    }
+
+    printf("Temperature Monitor\n");
+    printf("-------------------\n");
+
+    for (;;) {
+        printf("Select hardware revision (A/B): ");
+
+        if (fgets(input, sizeof(input), stdin) == NULL) {
+            fprintf(stderr, "Failed to read hardware revision.\n");
+            return EXIT_FAILURE;
+        }
+
+        if ((input[0] == 'A') ||
+            (input[0] == 'a') ||
+            (input[0] == '0')) {
+            stored_config.hardware_revision = SENSOR_REV_A;
+            break;
+        }
+
+        if ((input[0] == 'B') ||
+            (input[0] == 'b') ||
+            (input[0] == '1')) {
+            stored_config.hardware_revision = SENSOR_REV_B;
+            break;
+        }
+
+        printf("Invalid revision. Enter A or B.\n");
     }
 
     if (eeprom_write_config(&i2c, &stored_config) != 0) {
@@ -282,9 +310,7 @@ int main(void)
 
     sampling_timer_start();
 
-    printf("Temperature Monitor\n");
-    printf("-------------------\n");
-    printf("Serial number:      %s\n", loaded_config.serial_number);
+    printf("\nSerial number:      %s\n", loaded_config.serial_number);
     printf("Hardware revision:  Rev-%c\n",
            loaded_config.hardware_revision == SENSOR_REV_A ? 'A' : 'B');
     printf("Sensor resolution:  %.1f C/digit\n",
