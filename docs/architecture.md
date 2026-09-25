@@ -77,7 +77,7 @@ target drivers.
 
 Responsibilities:
 
-- Normalize sensor digits to tenths of a degree Celsius
+- Convert sensor digits to degrees Celsius using the selected resolution
 - Classify normalized temperature
 - Map temperature conditions to logical LED states
 - Represent statuses and domain values
@@ -269,7 +269,7 @@ The normal data flow is:
 1. EEPROM provides revision and serial number during initialization.
 2. Timer initiates an acquisition event.
 3. ADC provides one sensor digit.
-4. Sensor conversion produces a temperature in tenths of a degree Celsius.
+4. Sensor conversion produces a temperature in degrees Celsius.
 5. The classifier produces normal, warning, or critical.
 6. The LED controller produces mutually exclusive logical LED states.
 7. GPIO applies the requested output state.

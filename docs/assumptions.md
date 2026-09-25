@@ -65,11 +65,9 @@ For example, a Rev-A digit of 10 becomes an internal value of 100, representing
 
 ### ASM-005 — Rev-B normalization
 
-A valid Rev-B digit already represents tenths of a degree Celsius and therefore
-requires no scale change.
+A Rev-B digit is multiplied by 0.1 degrees Celsius per digit.
 
-For example, a Rev-B digit of 100 becomes an internal value of 100,
-representing 10.0 degrees Celsius.
+For example, a Rev-B digit of 100 represents 10.0 degrees Celsius.
 
 ### ASM-006 — ADC abstraction output
 
