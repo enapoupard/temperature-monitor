@@ -144,3 +144,12 @@ add_test(
     NAME c_eeprom_tests
     COMMAND c_eeprom_tests
 )
+
+target_sources(
+    c_temperature_simulation
+    PRIVATE
+        src/sampling_timer.c
+        src/gpio.c
+        src/i2c.c
+        src/eeprom.c
+)
